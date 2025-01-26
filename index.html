@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive To-Do List</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background-color: #f4f4f9;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 10px;
+    }
+    td {
+      vertical-align: top;
+      padding: 10px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+      width: calc(33.333% - 20px); /* 3列の均等な幅 */
+    }
+    h2 {
+      color: #4a90e2;
+      font-size: 1.2em;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    li {
+      background: #f9f9f9;
+      margin: 5px 0;
+      padding: 8px 10px;
+      border-radius: 5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      cursor: move;
+    }
+    li span {
+      cursor: pointer;
+    }
+    .add-task {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .add-task input {
+      flex: 1;
+      padding: 5px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+    }
+    .add-task button {
+      padding: 5px 10px;
+      background: #4a90e2;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .add-task button:hover {
+      background: #357abd;
+    }
+  </style>
+</head>
+<body>
+  <table>
+    <tr>
+      <td>
+        <h2 id="week-heading">Week 5</h2>
+        <ul class="task-list" data-list="week"></ul>
+        <div class="add-task">
+          <input type="text" placeholder="新しいタスクを追加">
+          <button>追加</button>
+        </div>
+      </td>
+      <td>
+        <h2 id="month-heading">February</h2>
+        <ul class="task-list" data-list="month"></ul>
+        <div class="add-task">
+          <input type="text" placeholder="新しいタスクを追加">
+          <button>追加</button>
+        </div>
+      </td>
+      <td>
+        <h2 id="quarter-heading">2024-Q1</h2>
+        <ul class="task-list" data-list="quarter"></ul>
+        <div class="add-task">
+          <input type="text" placeholder="新しいタスクを追加">
+          <button>追加</button>
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <script>
+    const storageKey = "todoAppData";
+    let taskData = JSON.parse(localStorage.getItem(storageKey)) || {
+      week: [],
+      month: [],
+      quarter: []
+    };
+
+    // 現在の日付を取得して、週、月、クオーターを更新
+    const updateHeaders = () => {
+      const now = new Date();
+      
+      // 週の番号を計算
+      const startOfYear = new Date(now.getFullYear(), 0, 1);
+      const weekNumber = Math.ceil((((now - startOfYear) / 86400000) + 1) / 7);
+      document.getElementById('week-heading').textContent = `Week ${weekNumber}`;
+
+      // 月の名前を設定
+      const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      document.getElementById('month-heading').textContent = months[now.getMonth()];
+
+      // クオーターの計算
+      const quarter = Math.floor((now.getMonth() + 3) / 3); // 1月-3月 -> Q1, 4月-6月 -> Q2, ...
+      document.getElementById('quarter-heading').textContent = `${now.getFullYear()}-Q${quarter + 1}`;
+    };
+
+    const renderTasks = () => {
+      document.querySelectorAll(".task-list").forEach((list) => {
+        const listKey = list.getAttribute("data-list");
+        list.innerHTML = "";
+        taskData[listKey].forEach((task, index) => {
+          const li = document.createElement("li");
+          li.draggable = true;
+          li.innerHTML = `<span>${task.done ? "✅" : "□"}</span> ${task.text}`;
+          li.addEventListener("click", () => toggleTask(listKey, index));
+          li.addEventListener("dragstart", (e) => dragStart(e, listKey, index));
+          li.addEventListener("dragover", (e) => e.preventDefault());
+          li.addEventListener("drop", (e) => dropTask(e, listKey));
+          list.appendChild(li);
+        });
+      });
+    };
+
+    const toggleTask = (listKey, index) => {
+      taskData[listKey][index].done = !taskData[listKey][index].done;
+      saveAndRender();
+    };
+
+    const addTask = (listKey, text) => {
+      if (!text.trim()) return;
+      taskData[listKey].push({ text, done: false });
+      saveAndRender();
+    };
+
+    const saveAndRender = () => {
+      localStorage.setItem(storageKey, JSON.stringify(taskData));
+      renderTasks();
+    };
+
+    const dragStart = (e, fromList, fromIndex) => {
+      e.dataTransfer.setData("fromList", fromList);
+      e.dataTransfer.setData("fromIndex", fromIndex);
+    };
+
+    const dropTask = (e, toList) => {
+      const fromList = e.dataTransfer.getData("fromList");
+      const fromIndex = e.dataTransfer.getData("fromIndex");
+      const [movedTask] = taskData[fromList].splice(fromIndex, 1);
+      taskData[toList].push(movedTask);
+      saveAndRender();
+    };
+
+    document.querySelectorAll(".add-task button").forEach((button) => {
+      button.addEventListener("click", (e) => {
+        const listKey = button.closest("td").querySelector(".task-list").getAttribute("data-list");
+        const input = button.previousElementSibling;
+        addTask(listKey, input.value);
+        input.value = "";
+      });
+    });
+
+    updateHeaders();
+    renderTasks();
+  </script>
+</body>
+</html>
